@@ -14,6 +14,8 @@ load_dotenv()
 
 NYT_API_KEY = os.getenv("NYT_API_KEY")
 
+total_articles_recorded = 0
+
 
 #Scrape 5000+ articles from New York Times.
 #title, name of the newspaper, url, publish date, writers, article content and other metadata
@@ -46,6 +48,59 @@ def get_nyt_articles(start_date, end_date, page, max_retries = 5):
 def append_article_to_jsonl(article_data, filename="nyt_articles.jsonl"):
     with open(filename, "a", encoding="utf-8") as f:
         f.write(json.dumps(article_data, ensure_ascii=False) + "\n")
+    total_articles_recorded += 1
+    print(f"total articles recorded to file: {total_articles_recorded}")
+
+def robust_get(url, max_retries=5, wait_seconds=60):
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching {url}: {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {wait_seconds} seconds... (Attempt {attempt+1}/{max_retries})")
+                time.sleep(wait_seconds)
+            else:
+                print("Max retries reached. Skipping this article.")
+                return None
+
+def safe_save_to_wayback(url, user_agent, max_retries=5):
+    retries = 0
+    while retries < max_retries:
+        try:
+            save_api = waybackpy.WaybackMachineSaveAPI(url, user_agent)
+            return save_api.save()
+        except waybackpy.exceptions.TooManyRequestsError:
+            print("Wayback Machine rate limit hit. Waiting 5 minutes before retrying...")
+            time.sleep(300)
+            retries += 1
+        except requests.exceptions.ConnectionError as e:
+            print(f"Connection error: {e}. Waiting 1 minute before retrying...")
+            time.sleep(60)
+            retries += 1
+        except Exception as e:
+            print(f"Unexpected error during save: {e}. Skipping this article.")
+            return None
+    print("Max retries reached for archiving. Skipping this article.")
+    return None
+
+def safe_lookup_wayback(url, user_agent, max_retries=5):
+    retries = 0
+    while retries < max_retries:
+        try:
+            lookup_api = waybackpy.WaybackMachineCDXServerAPI(url, user_agent)
+            return lookup_api.newest().archive_url
+        except requests.exceptions.ConnectionError as e:
+            print(f"Connection error during lookup: {e}. Waiting 1 minute before retrying...")
+            time.sleep(60)
+            retries += 1
+        except Exception as e:
+            print(f"Unexpected error during lookup: {e}. Skipping this article.")
+            return None
+    print("Max retries reached for lookup. Skipping this article.")
+    return None
 
 def write_to_json(articles):
     print(f"Total articles to process: {len(articles)}")
@@ -55,16 +110,26 @@ def write_to_json(articles):
         url = article["web_url"]
         user_agent = "Mozilla/5.0"
 
-        save_api = waybackpy.WaybackMachineSaveAPI(url, user_agent)
+        #first check if its already archived
         archive_url = None
-        while archive_url is None:
-            try:
-                archive_url = save_api.save()
-            except waybackpy.exceptions.TooManyRequestsError:
-                print("Wayback Machine rate limit hit. Waiting 5 minutes before retrying...")
-                time.sleep(300) 
-
-        response = requests.get(archive_url)
+        loopup_api = waybackpy.WaybackMachineCDXServerAPI(url, user_agent)
+        try:
+            snapshot_url = loopup_api.newest()
+            archive_url = snapshot_url.archive_url
+            print(f"already archived")
+        except Exception:
+            #if not archived, try to archive it
+            archive_url = safe_save_to_wayback(url, user_agent)
+        
+        if archive_url is None:
+            with open("failed_urls.txt", "a") as fail_log:
+                fail_log.write(url + "\n")
+            continue
+        
+        response = robust_get(archive_url)
+        if response is None:
+            print(f"Failed to fetch archived page for {url}, skipping.")
+            continue
         soup = BeautifulSoup(response.text, "html.parser")
 
         article_body = soup.find("section", {"name": "articleBody"})
@@ -110,7 +175,7 @@ def main():
         page = 0
         print(f"now fetching starting {start_date_str}, ending {end_date_str}")
         while True:
-            print(f"Current total articles processed: {total_articles}")
+            print(f"Current total articles parsed into program: {total_articles}")
             articles = get_nyt_articles(start_date_str, end_date_str, page)
             if not articles:
                 print("Received none from this request, proceed to next week")

@@ -4,3 +4,4 @@ trafilatura
 playwright
 bs4
 waybackpy
+beautifulsoup4
