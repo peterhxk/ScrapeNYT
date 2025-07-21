@@ -1,0 +1,6 @@
+python-dotenv
+requests
+trafilatura
+playwright
+bs4
+waybackpy

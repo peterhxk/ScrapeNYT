@@ -1,0 +1,14 @@
+Machine Learning Media Bias by Tegmark et al.
+Summarize and highlight how we can adapt it to Geopolitical Bias
+
+Summarize:
+They use machine learning to scan articles and use sentences to predict two things:
+- First, the political aspect of the articles in terms of the political left and right scale, aka conservative and liberative.
+- Second, which news paper establishment published it.
+
+How we can adapt it to Geopolitical Bias:
+They use MITNewsClassify package from https://www.improvethenews.org/news-slider for classifying their articles in the political scale of left and right.
+To adapt it for Geopolitical Bias, instead of the left and right scale, we can use its "establishment stance".
+The establishment stance feature is capable of identifying how bias are the articles towards countries.
+Then we can use the similar methods from the article to achieve what we want.
+
