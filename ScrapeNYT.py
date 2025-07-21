@@ -46,6 +46,7 @@ def get_nyt_articles(start_date, end_date, page, max_retries = 5):
                 return None
 
 def append_article_to_jsonl(article_data, filename="nyt_articles.jsonl"):
+    global total_articles_recorded
     with open(filename, "a", encoding="utf-8") as f:
         f.write(json.dumps(article_data, ensure_ascii=False) + "\n")
     total_articles_recorded += 1
