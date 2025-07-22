@@ -8,7 +8,7 @@ import time
 import trafilatura
 import waybackpy
 import json
-
+from newspaper import Article
 
 load_dotenv()
 
@@ -52,56 +52,9 @@ def append_article_to_jsonl(article_data, filename="nyt_articles.jsonl"):
     total_articles_recorded += 1
     print(f"total articles recorded to file: {total_articles_recorded}")
 
-def robust_get(url, max_retries=5, wait_seconds=60):
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            return response
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching {url}: {e}")
-            if attempt < max_retries - 1:
-                print(f"Retrying in {wait_seconds} seconds... (Attempt {attempt+1}/{max_retries})")
-                time.sleep(wait_seconds)
-            else:
-                print("Max retries reached. Skipping this article.")
-                return None
-
-def safe_save_to_wayback(url, user_agent, max_retries=5):
-    retries = 0
-    while retries < max_retries:
-        try:
-            save_api = waybackpy.WaybackMachineSaveAPI(url, user_agent)
-            return save_api.save()
-        except waybackpy.exceptions.TooManyRequestsError:
-            print("Wayback Machine rate limit hit. Waiting 5 minutes before retrying...")
-            time.sleep(300)
-            retries += 1
-        except requests.exceptions.ConnectionError as e:
-            print(f"Connection error: {e}. Waiting 1 minute before retrying...")
-            time.sleep(60)
-            retries += 1
-        except Exception as e:
-            print(f"Unexpected error during save: {e}. Skipping this article.")
-            return None
-    print("Max retries reached for archiving. Skipping this article.")
-    return None
-
-def safe_lookup_wayback(url, user_agent, max_retries=5):
-    retries = 0
-    while retries < max_retries:
-        try:
-            lookup_api = waybackpy.WaybackMachineCDXServerAPI(url, user_agent)
-            return lookup_api.newest().archive_url
-        except requests.exceptions.ConnectionError as e:
-            print(f"Connection error during lookup: {e}. Waiting 1 minute before retrying...")
-            time.sleep(60)
-            retries += 1
-        except Exception as e:
-            print(f"Unexpected error during lookup: {e}. Skipping this article.")
-            return None
-    print("Max retries reached for lookup. Skipping this article.")
-    return None
+def log_failed_url(url, filename="failed_urls.txt"):
+    with open(filename, "a", encoding="utf-8") as f:
+        f.write(url + "\n")
 
 def write_to_json(articles):
     print(f"Total articles to process: {len(articles)}")
@@ -109,43 +62,15 @@ def write_to_json(articles):
     for idx, article in enumerate(articles):
         print(f"Proceeding with article index {idx}")
         url = article["web_url"]
-        user_agent = "Mozilla/5.0"
 
-        #first check if its already archived
-        archive_url = None
-        loopup_api = waybackpy.WaybackMachineCDXServerAPI(url, user_agent)
         try:
-            snapshot_url = loopup_api.newest()
-            archive_url = snapshot_url.archive_url
-            print(f"already archived")
-        except Exception:
-            #if not archived, try to archive it
-            archive_url = safe_save_to_wayback(url, user_agent)
-        
-        if archive_url is None:
-            with open("failed_urls.txt", "a") as fail_log:
-                fail_log.write(url + "\n")
-            continue
-        
-        response = robust_get(archive_url)
-        if response is None:
-            print(f"Failed to fetch archived page for {url}, skipping.")
-            continue
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        article_body = soup.find("section", {"name": "articleBody"})
-        if article_body:
-            paragraphs = article_body.find_all("p")
-            text = "\n".join([p.get_text() for p in paragraphs])
-            print("Article content found")
-        else:
-            print("Could not find article body. Try extracting all <p> tags as fallback.")
-            paragraphs = soup.find_all("p")
-            text = "\n".join([p.get_text() for p in paragraphs])
-            print("Fallback content found")
-        
-        if not text:
+            article_from_newspaper = Article(url)
+            article_from_newspaper.download()
+            article_from_newspaper.parse()
+            text = article_from_newspaper.text
+        except Exception as e:
             print(f"Could not extract article body, skipping article of {url}")
+            log_failed_url(url)
             continue
         
         title = article["headline"]["main"]
@@ -153,7 +78,6 @@ def write_to_json(articles):
             "title": title,
             "newspaper": article["source"],
             "url": article["web_url"],
-            "archive_url": archive_url,
             "publish_date": article["pub_date"],
             "writers": article["byline"]["original"],
             "content": text

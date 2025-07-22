@@ -1,25 +1,15 @@
-from waybackpy import WaybackMachineSaveAPI
-import requests
-from bs4 import BeautifulSoup
+from newspaper import Article
 
-url = "https://www.nytimes.com/2025/07/20/us/politics/ice-agents-masks.html"
-user_agent = "Mozilla/5.0"
+url = 'https://www.nytimes.com/2025/07/20/obituaries/edwin-feulner-dead.html'
 
-save = requests.get(f"https://web.archive.org/save/{url}")
-print(save.status_code)
-# save_api = WaybackMachineSaveAPI(url, user_agent)
-# archive_url = save_api.save()
-
-# response = requests.get(archive_url)
-# soup = BeautifulSoup(response.text, "html.parser")
-
-# article_body = soup.find("section", {"name": "articleBody"})
-# if article_body:
-#     paragraphs = article_body.find_all("p")
-#     text = "\n".join([p.get_text() for p in paragraphs])
-#     print("Article content:\n", text)
-# else:
-#     print("Could not find article body. Try extracting all <p> tags as fallback.")
-#     paragraphs = soup.find_all("p")
-#     text = "\n".join([p.get_text() for p in paragraphs])
-#     print("Fallback content:\n", text)
+try:
+    article = Article(url)
+    article.download()
+    article.parse()
+    print("Title:", article.title)
+    print("Authors:", article.authors)
+    print("Publish Date:", article.publish_date)
+    print("Top Image:", article.top_image)
+    print("Text:\n", article.text)  # Print first 1000 characters
+except Exception as e:
+    print(f"Failed to extract article: {e}")
