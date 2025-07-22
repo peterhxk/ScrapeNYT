@@ -10,6 +10,7 @@ To run the model for scraping NYT, you may follow these steps:
 
 The program saves the scraped information to nyt_articles.jsonl. You may then use Read_jsonl.py to extract from it.
 Data format:
+
 data
   - title
   - newspaper
@@ -18,3 +19,5 @@ data
   - publish_date
   - writers
   - content
+
+Unsuccessful fetches will be appended to failed_urls.txt
