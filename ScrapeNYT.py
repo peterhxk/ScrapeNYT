@@ -23,14 +23,41 @@ total_articles_recorded = 0
 
 def get_nyt_articles(start_date, end_date, page, max_retries = 6):
     url = f"https://api.nytimes.com/svc/search/v2/articlesearch.json?begin_date={start_date}&end_date={end_date}&page={page}&api-key={NYT_API_KEY}"
+    
+    USER_AGENTS = [
+        # Chrome - Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    # Chrome - macOS
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15",
+    # Chrome - Linux
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    # Firefox - Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
+    # Firefox - macOS
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13.2; rv:109.0) Gecko/20100101 Firefox/117.0",
+    # Edge - Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.35",
+    # Opera - Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.5672.64 Safari/537.36 OPR/98.0.4759.15",
+    # Safari - iPhone
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    # Safari - iPad
+    "Mozilla/5.0 (iPad; CPU OS 15_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
+    # Chrome - Android
+    "Mozilla/5.0 (Linux; Android 12; Pixel 6 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.131 Mobile Safari/537.36",
+
+    ]
     requestHeaders = {
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "User-Agent": random.choice(USER_AGENTS)
     }
     retries = 0
     while retries < max_retries:
         try:
             response = requests.get(url, headers=requestHeaders)
             if response.status_code == 200:
+                print("request success, auto sleep for 2.5-5.0s")
+                time.sleep(random.uniform(2.5, 5.0))
                 return response.json()
             elif response.status_code == 429:
                 retry_after = response.headers.get("Retry-After")
@@ -45,6 +72,7 @@ def get_nyt_articles(start_date, end_date, page, max_retries = 6):
             print(f"Rate limited. Sleeping {sleep_time:.2f} seconds...")
             time.sleep(sleep_time)
     print("Max retries reached. Skipping this request.")
+    log_failed_request(start_date,end_date,page)
     return None
 
 def append_article_to_jsonl(article_data, filename="nyt_articles.jsonl"):
@@ -57,6 +85,9 @@ def append_article_to_jsonl(article_data, filename="nyt_articles.jsonl"):
 def log_failed_url(url, filename="failed_urls.txt"):
     with open(filename, "a", encoding="utf-8") as f:
         f.write(url + "\n")
+def log_failed_request(start_date, end_date, page, filename="failed_requests.txt"):
+    with open(filename, "a", encoding="utf-8") as f:
+        f.write(f"{start_date},{end_date},{page}"+"\n")
 
 def write_to_json(articles):
     print(f"Total articles to process: {len(articles)}")
