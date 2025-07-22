@@ -9,6 +9,7 @@ import trafilatura
 import waybackpy
 import json
 from newspaper import Article
+import random
 
 load_dotenv()
 
@@ -20,7 +21,7 @@ total_articles_recorded = 0
 #Scrape 5000+ articles from New York Times.
 #title, name of the newspaper, url, publish date, writers, article content and other metadata
 
-def get_nyt_articles(start_date, end_date, page, max_retries = 5):
+def get_nyt_articles(start_date, end_date, page, max_retries = 6):
     url = f"https://api.nytimes.com/svc/search/v2/articlesearch.json?begin_date={start_date}&end_date={end_date}&page={page}&api-key={NYT_API_KEY}"
     requestHeaders = {
         "Accept": "application/json"
@@ -29,21 +30,22 @@ def get_nyt_articles(start_date, end_date, page, max_retries = 5):
     while retries < max_retries:
         try:
             response = requests.get(url, headers=requestHeaders)
-            if response.status_code == 429:
-                print("Received 429 Too Many Requests. Sleeping for 10s")
-                time.sleep(10)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                if retry_after:
+                    time.sleep(int(retry_after))
+                    continue
                 retries += 1
-                continue
-            return response.json()
-        except requests.exceptions.RequestException as e:
+                raise Exception("429 Too many requests from NYT")
+        except Exception as e:
             print(f"Request failed: {e}")
-            if retries < max_retries -1:
-                print("Retrying in 10 seconds...")
-                time.sleep(10)
-                retries += 1
-            else:
-                print("Max retries reached. Skipping this request.")
-                return None
+            sleep_time = random.uniform(2 ** retries, 2 ** (retries + 1))
+            print(f"Rate limited. Sleeping {sleep_time:.2f} seconds...")
+            time.sleep(sleep_time)
+    print("Max retries reached. Skipping this request.")
+    return None
 
 def append_article_to_jsonl(article_data, filename="nyt_articles.jsonl"):
     global total_articles_recorded
@@ -108,7 +110,7 @@ def main():
             docs = articles['response']['docs'] 
             if not docs:
                 break
-            print(f"Proceeding with archiving to extract article content, length {len(docs)}")
+            print(f"Proceeding with extracting article content, length {len(docs)}")
             total_articles+=10
             write_to_json(docs)
             
