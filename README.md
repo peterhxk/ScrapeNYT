@@ -15,9 +15,8 @@ data
   - title
   - newspaper
   - url
-  - archive_url
   - publish_date
   - writers
   - content
 
-Unsuccessful fetches will be appended to failed_urls.txt
+Unsuccessful fetches will be appended to failed_urls.txt and failed_requests.txt
