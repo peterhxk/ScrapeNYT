@@ -5,3 +5,4 @@ playwright
 bs4
 waybackpy
 beautifulsoup4
+newspaper4k
