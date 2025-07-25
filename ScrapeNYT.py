@@ -68,7 +68,7 @@ def get_nyt_articles(start_date, end_date, page, max_retries = 6):
                 raise Exception("429 Too many requests from NYT")
         except Exception as e:
             print(f"Request failed: {e}")
-            sleep_time = random.uniform(2 ** retries, 2 ** (retries + 1))
+            sleep_time = random.uniform(20+2 ** retries, 20+2 ** (retries + 1))
             print(f"Rate limited. Sleeping {sleep_time:.2f} seconds...")
             time.sleep(sleep_time)
     print("Max retries reached. Skipping this request.")
